@@ -1,6 +1,11 @@
-<div>
-  <div class="flex">
-    <button></button>
+<div class="m-3">
+  <div class="flex gap-[5%] bg-gray-200 py-1 px-2.5 rounded-t-xl">
+    <button class="bg-red-700 py-0.5 px-2 rounded-md text-white" (click)="handleDelete()">Delete</button>
+    <div class="flex items-center">
+      <p class="mr-2">edge weight: </p>
+      <input class="bg-emerald-600 rounded-2xl px-3 max-w-40"
+       type="number" [innerText]="'asd'" (change)="inputChangeHandler($event)">
+    </div>
   </div>
   <div id="cy">
   
