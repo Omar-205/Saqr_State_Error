@@ -4,7 +4,9 @@
     <div class="flex items-center">
       <p class="mr-2">edge weight: </p>
       <input class="bg-emerald-600 rounded-2xl px-3 max-w-40"
-       type="number" [innerText]="'asd'" (change)="inputChangeHandler($event)">
+       type="number" [innerText]="'asd'" (change)="inputChangeHandler($event)" aria-label="edge_weight" />
+       <button class="bg-green-700 py-0.5 px-2 rounded-md text-white ml-2" (click)="handleCalculate()">Calculate</button>
+       <p class="ml-4">OverAll Transfer function: {{transferFunction()}}</p>
     </div>
   </div>
   <div id="cy">

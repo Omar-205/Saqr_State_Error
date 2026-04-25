@@ -1,9 +1,9 @@
-import { NonNullAssert } from '@angular/compiler';
-import { AfterViewInit, Component, computed, ElementRef, EventEmitter, OnDestroy, Output, Signal, signal, ViewChild } from '@angular/core';
-import { form, FormField } from '@angular/forms/signals';
+import { AfterViewInit, Component, computed,  EventEmitter, OnDestroy, Output,  signal } from '@angular/core';
+import { FormField } from '@angular/forms/signals';
+import { MasonSolver } from './mason-solver';
 
 import cytoscape from 'cytoscape';
-import { elementAt, every, single } from 'rxjs';
+import { inject } from '@angular/core';
 
 @Component({
 	selector: 'app-graph',
@@ -15,9 +15,12 @@ import { elementAt, every, single } from 'rxjs';
 export class Graph implements AfterViewInit, OnDestroy {
 
 	private cy= signal<cytoscape.Core | undefined>(undefined)
+	private masonSolver = inject(MasonSolver);
+	transferFunction = signal<string>('0');
 
 	@Output() calculate = new EventEmitter()
 
+	// here he is initializing the project with two fixed nodes representing the input and output nodes
 	ngAfterViewInit(): void {
 		this.initializeCytoscape()
 		this.initializeEvents()
@@ -36,6 +39,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 		}
 		});
 	}
+	// these two computed properties are used to get the current state of the graph, which is useful for the calculation part that i will use.
 	nodes = computed(() => this.cy()?.nodes().map((n: any) => n._private.data))
 	edges = computed(() => this.cy()?.edges().map((n: any) => n._private.data))
 	ngOnDestroy(): void {
@@ -191,6 +195,25 @@ export class Graph implements AfterViewInit, OnDestroy {
 	}
 	getNodes = () => this.cy()?.nodes().map((n: any) => n._private.data)
 	getEdges = () => this.cy()?.edges().map((n: any) => n._private.data)
+
+	handleCalculate = () => {
+		const currentNodes = this.nodes();
+		const currentEdges = this.edges();
+
+		if (!currentNodes || !currentEdges) return;
+		console.log('Calculating Mason...');
+		const result = this.masonSolver.solve(currentNodes, currentEdges);
+
+		console.log('Final Result:', result);
+
+		if (typeof result === 'number') {
+			this.transferFunction.set(result.toFixed(4)); 
+		} else {
+			this.transferFunction.set(result);
+		}
+
+		this.calculate.emit(result);
+	}
 }
 
 function generateUUID() {
