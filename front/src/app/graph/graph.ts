@@ -1,13 +1,11 @@
 import { NonNullAssert } from '@angular/compiler';
 import { AfterViewInit, Component, computed, ElementRef, EventEmitter, OnDestroy, Output, Signal, signal, ViewChild } from '@angular/core';
-import { form, FormField } from '@angular/forms/signals';
 
 import cytoscape from 'cytoscape';
 import { elementAt, every, single } from 'rxjs';
 
 @Component({
 	selector: 'app-graph',
-	imports: [FormField],
 	standalone: true,
 	templateUrl: './graph.html',
 	styleUrl: './graph.css',
@@ -15,6 +13,7 @@ import { elementAt, every, single } from 'rxjs';
 export class Graph implements AfterViewInit, OnDestroy {
 
 	private cy= signal<cytoscape.Core | undefined>(undefined)
+	useNodeImageBackground = false;
 
 	@Output() calculate = new EventEmitter()
 
@@ -72,7 +71,13 @@ export class Graph implements AfterViewInit, OnDestroy {
 						'color': 'black',
 						"border-color": 'black',
 						'border-width': '2',
-						'font-size': '16px'
+						'font-size': '16px',
+						...(this.useNodeImageBackground
+							? {
+								'background-image': '/saqr.jpeg',
+								'background-fit': 'cover'
+							}
+							: {})
 					}
 				},
 				{
