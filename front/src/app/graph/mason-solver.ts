@@ -3,12 +3,14 @@ import { Injectable } from '@angular/core';
 export type MasonLoopDetail = {
   id: string;
   nodes: string[];
+  labels: string[];
   gain: number;
 };
 
 export type MasonForwardPathDetail = {
   id: string;
   nodes: string[];
+  labels: string[];
   gain: number;
 };
 
@@ -55,19 +57,22 @@ export class MasonSolver {
   solveWithDetails(nodes: any[], edges: any[]): MasonResultDetail {
     const adjList = this.convertToAdjList(nodes, edges);
 
-    const forwardPaths = this.findForwardPaths(adjList, 'input', 'output');
+    const forwardPaths = this.findForwardPaths(adjList, 'input', 'output');   //We may need to adjust this part for subgraphs if asked (ya3ni law 2ali men node 2 l node 7)
     const allLoops = this.findLoops(adjList);
     const uniqueLoops = this.filterUniqueLoops(allLoops);
+    const labelMap = this.NodeLabelList(nodes);
 
     const forwardPathDetails: MasonForwardPathDetail[] = forwardPaths.map((path, index) => ({
       id: `P${index + 1}`,
       nodes: path,
+      labels: this.getNodesLabels(path, labelMap),
       gain: this.getPathGain(path, adjList),
     }));
 
     const loopDetails: MasonLoopDetail[] = uniqueLoops.map((loop, index) => ({
       id: `L${index + 1}`,
       nodes: loop,
+      labels: this.getNodesLabels(loop, labelMap),
       gain: this.getLoopGain(loop, adjList),
     }));
 
@@ -384,5 +389,22 @@ export class MasonSolver {
     }
     backtrack(0, []);
     return finalGroups;
+  }
+
+  private NodeLabelList(nodes: any[]): { [key: string]: string } {
+    const labelMap: { [key: string]: string } = {};
+    nodes.forEach(node => {
+      labelMap[node.id] = node.label;
+    });
+    return labelMap;
+  }
+
+  private getNodesLabels(path: string[], labelMap: { [key: string]: string }): string[] {
+    const names = path.map(nodeId => {
+      if (nodeId === 'input') return 'input';
+      if (nodeId === 'output') return 'output';
+      return labelMap[nodeId] || nodeId;
+    });
+    return names;
   }
 }
