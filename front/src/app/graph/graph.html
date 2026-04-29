@@ -19,7 +19,7 @@
       <li>Click on a node to get it green.</li>
       <li>Set the edge weight above, then shift+clk on the target node (to put the weighted edge between the green node and this target node).</li>
       <li>Select a node or edge and press Delete to remove it.</li>
-      <li>press calculate to get the ooverall transfer function.</li>
+      <li>press calculate to get the overall transfer function.</li>
     </ol>
   </div>
   <div class="mt-4 p-3 bg-white rounded-lg border" *ngIf="masonDetails() as details">
@@ -38,7 +38,7 @@
               class="step-button"
               [class.step-button-active]="activeStepIndex() === getLoopStepIndex(i)"
               (click)="highlightStep(getLoopStepIndex(i))">
-              {{loop.id}}: {{formatPath(loop.nodes.concat(loop.nodes[0]))}} (gain = {{loop.gain | number:'1.4-4'}})
+              {{loop.id}}: {{formatPath(loop.labels.concat(loop.labels[0]))}} (gain = {{loop.gain | number:'1.4-4'}})
             </button>
           </li>
         </ol>
@@ -53,7 +53,7 @@
               class="step-button"
               [class.step-button-active]="activeStepIndex() === getPathStepIndex(i)"
               (click)="highlightStep(getPathStepIndex(i))">
-              {{path.id}}: {{formatPath(path.nodes)}} (gain = {{path.gain | number:'1.4-4'}})
+              {{path.id}}: {{formatPath(path.labels)}} (gain = {{path.gain | number:'1.4-4'}})
             </button>
           </li>
         </ol>

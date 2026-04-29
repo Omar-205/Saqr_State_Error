@@ -13,7 +13,7 @@ import { inject } from '@angular/core';
 })
 export class Graph implements AfterViewInit, OnDestroy {
 
-	private cy= signal<cytoscape.Core | undefined>(undefined)
+  private cy= signal<cytoscape.Core | undefined>(undefined)
   private masonSolver = inject(MasonSolver);
   transferFunction = signal<string>('0');
   useNodeImageBackground = false;
@@ -266,6 +266,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 		  private buildHighlightSteps(details: MasonResultDetail): HighlightStep[] {
 			const loopSteps = details.loops.map(loop => ({
 			  id: loop.id,
+			  labels: loop.labels,
 			  title: `${loop.id} (Loop)` ,
 			  description: this.formatPath(loop.nodes.concat(loop.nodes[0])),
 			  nodes: loop.nodes,
@@ -274,6 +275,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 
 			const pathSteps = details.forwardPaths.map(path => ({
 			  id: path.id,
+			  labels: path.labels,
 			  title: `${path.id} (Forward Path)`,
 			  description: this.formatPath(path.nodes),
 			  nodes: path.nodes,
