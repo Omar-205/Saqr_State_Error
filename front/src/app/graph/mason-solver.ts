@@ -1,5 +1,46 @@
 import { Injectable } from '@angular/core';
 
+export type MasonLoopDetail = {
+  id: string;
+  nodes: string[];
+  gain: number;
+};
+
+export type MasonForwardPathDetail = {
+  id: string;
+  nodes: string[];
+  gain: number;
+};
+
+export type MasonNonTouchingGroupDetail = {
+  size: number;
+  sign: number;
+  groups: {
+    loopIds: string[];
+    gainProduct: number;
+  }[];
+  total: number;
+};
+
+export type MasonPathDeltaDetail = {
+  pathId: string;
+  delta: number;
+  independentLoopIds: string[];
+  nonTouchingGroups: MasonNonTouchingGroupDetail[];
+  steps: string[];
+};
+
+export type MasonResultDetail = {
+  delta: number;
+  overallGain: number | string;
+  forwardPaths: MasonForwardPathDetail[];
+  loops: MasonLoopDetail[];
+  nonTouchingGroups: MasonNonTouchingGroupDetail[];
+  pathDeltas: MasonPathDeltaDetail[];
+  deltaSteps: string[];
+  numerator: number;
+};
+
 @Injectable({
   providedIn: 'root',
 })
@@ -7,93 +48,187 @@ export class MasonSolver {
   constructor() {}
 
   solve(nodes: any[], edges: any[]) {
+    const details = this.solveWithDetails(nodes, edges);
+    return details.overallGain;
+  }
+
+  solveWithDetails(nodes: any[], edges: any[]): MasonResultDetail {
     const adjList = this.convertToAdjList(nodes, edges);
 
     const forwardPaths = this.findForwardPaths(adjList, 'input', 'output');
-
     const allLoops = this.findLoops(adjList);
-
     const uniqueLoops = this.filterUniqueLoops(allLoops);
 
-    console.log('Forward Paths:', forwardPaths);
-    console.log('Unique Loops:', uniqueLoops);
+    const forwardPathDetails: MasonForwardPathDetail[] = forwardPaths.map((path, index) => ({
+      id: `P${index + 1}`,
+      nodes: path,
+      gain: this.getPathGain(path, adjList),
+    }));
+
+    const loopDetails: MasonLoopDetail[] = uniqueLoops.map((loop, index) => ({
+      id: `L${index + 1}`,
+      nodes: loop,
+      gain: this.getLoopGain(loop, adjList),
+    }));
 
     const allNonTouchingLoops = this.getAllNonTouchingLoops(uniqueLoops);
+
+    const getLoopId = (loop: string[]) => {
+      const idx = uniqueLoops.indexOf(loop);
+      return idx >= 0 ? loopDetails[idx].id : 'L?';
+    };
 
     // hena habd2 27seb 2wel 7aga hea 2l determint 2l kebera 2ly hea 1- all non touching loops + all non touching loops of size 2 - all non touching loops of size 3 + ...
     let delta = 1;
 
-    for(let i = 0; i < uniqueLoops.length; i++) {
+    for (let i = 0; i < uniqueLoops.length; i++) {
       delta -= this.getLoopGain(uniqueLoops[i], adjList);
     }
+
+    const nonTouchingGroupDetails: MasonNonTouchingGroupDetail[] = [];
 
     for (let i = 2; i < allNonTouchingLoops.length; i++) {
       const currentLevelGroups = allNonTouchingLoops[i];
       if (!currentLevelGroups || currentLevelGroups.length === 0) {
-          break; 
+        break;
       }
-      
-      const gainProduct = currentLevelGroups.reduce((acc, group) => {
-        const groupGain = group.reduce((gAcc, loop) => gAcc * this.getLoopGain(loop, adjList), 1);
-        return acc + groupGain;
-      }, 0);
 
-      delta += (i % 2 === 0 ? 1 : -1) * gainProduct;
+      const groups = currentLevelGroups.map(group => {
+        const loopIds = group.map(loop => getLoopId(loop));
+        const gainProduct = group.reduce((gAcc, loop) => gAcc * this.getLoopGain(loop, adjList), 1);
+        return { loopIds, gainProduct };
+      });
+
+      const total = groups.reduce((acc, group) => acc + group.gainProduct, 0);
+      const sign = i % 2 === 0 ? 1 : -1;
+
+      nonTouchingGroupDetails.push({
+        size: i,
+        sign,
+        groups,
+        total,
+      });
+
+      delta += sign * total;
     }
 
-    if(delta === 0){
+    const deltaSteps: string[] = [];
+    if (loopDetails.length) {
+      deltaSteps.push(`Loop gains: ${loopDetails.map(loop => `${loop.id}=${loop.gain.toFixed(4)}`).join(', ')}`);
+      deltaSteps.push(`Δ = 1 - (${loopDetails.map(loop => loop.id).join(' + ')})`);
+    } else {
+      deltaSteps.push('No loops found. Δ = 1');
+    }
+
+    nonTouchingGroupDetails.forEach(detail => {
+      const term = detail.groups.map(group => group.loopIds.join('*')).join(' + ');
+      const signText = detail.sign > 0 ? '+' : '-';
+      deltaSteps.push(`${signText} (${term}) = ${detail.total.toFixed(4)}`);
+    });
+
+    if (delta === 0) {
       console.error('Delta is zero, system is unstable or has infinite gain.');
-      return "Undefined (Delta is zero) System is unstable or has infinite gain.";
+      return {
+        delta,
+        overallGain: 'Undefined (Delta is zero) System is unstable or has infinite gain.',
+        forwardPaths: forwardPathDetails,
+        loops: loopDetails,
+        nonTouchingGroups: nonTouchingGroupDetails,
+        pathDeltas: [],
+        deltaSteps,
+        numerator: 0,
+      };
     }
 
-    let overallGain = 0;
+    let numerator = 0;
+    const pathDeltas: MasonPathDeltaDetail[] = [];
 
-    forwardPaths.forEach(path => {
+    forwardPaths.forEach((path, index) => {
       const pathGain = this.getPathGain(path, adjList);
       const { independentLoops, nonTouchingGroups } = this.getPathNonTouchingLoops(path, uniqueLoops);
 
       let deltaPath = 1;
+      const stepLines: string[] = [];
+      const independentLoopIds = independentLoops.map(loop => getLoopId(loop));
 
-      independentLoops.forEach(loop => {
-        deltaPath -= this.getLoopGain(loop, adjList);
-      });
+      if (independentLoops.length) {
+        independentLoops.forEach(loop => {
+          deltaPath -= this.getLoopGain(loop, adjList);
+        });
+        stepLines.push(`Δ${index + 1} = 1 - (${independentLoopIds.join(' + ')})`);
+      } else {
+        stepLines.push(`Δ${index + 1} = 1 (no touching loops)`);
+      }
+
+      const pathNonTouchingDetails: MasonNonTouchingGroupDetail[] = [];
 
       for (let i = 2; i < nonTouchingGroups.length; i++) {
         const currentLevelGroups = nonTouchingGroups[i];
         if (!currentLevelGroups || currentLevelGroups.length === 0) {
-            break; 
+          break;
         }
-        
-        const gainProduct = currentLevelGroups.reduce((acc, group) => {
-          const groupGain = group.reduce((gAcc, loop) => gAcc * this.getLoopGain(loop, adjList), 1);
-          return acc + groupGain;
-        }, 0);
 
-        deltaPath += (i % 2 === 0 ? 1 : -1) * gainProduct;
+        const groups = currentLevelGroups.map(group => {
+          const loopIds = group.map(loop => getLoopId(loop));
+          const gainProduct = group.reduce((gAcc, loop) => gAcc * this.getLoopGain(loop, adjList), 1);
+          return { loopIds, gainProduct };
+        });
+
+        const total = groups.reduce((acc, group) => acc + group.gainProduct, 0);
+        const sign = i % 2 === 0 ? 1 : -1;
+        deltaPath += sign * total;
+
+        pathNonTouchingDetails.push({
+          size: i,
+          sign,
+          groups,
+          total,
+        });
+
+        const term = groups.map(group => group.loopIds.join('*')).join(' + ');
+        const signText = sign > 0 ? '+' : '-';
+        stepLines.push(`${signText} (${term}) = ${total.toFixed(4)}`);
       }
-      overallGain += (pathGain * deltaPath);
+
+      numerator += pathGain * deltaPath;
+
+      pathDeltas.push({
+        pathId: `P${index + 1}`,
+        delta: deltaPath,
+        independentLoopIds,
+        nonTouchingGroups: pathNonTouchingDetails,
+        steps: stepLines,
+      });
 
       console.log(`Path: ${path.join('->')}, Gain: ${pathGain}, Delta Path: ${deltaPath}`);
     });
 
-    overallGain /= delta;
-
+    const overallGain = numerator / delta;
     console.log('Overall Gain (Transfer Function):', overallGain);
 
-    return overallGain;
+    return {
+      delta,
+      overallGain,
+      forwardPaths: forwardPathDetails,
+      loops: loopDetails,
+      nonTouchingGroups: nonTouchingGroupDetails,
+      pathDeltas,
+      deltaSteps,
+      numerator,
+    };
   }
 
   private getPathNonTouchingLoops(path: string[], uniqueLoops: string[][]) {
 
     const pathIndependentLoops = uniqueLoops.filter(loop => !this.isTouching(path, loop));
     return {
-        independentLoops: pathIndependentLoops, 
+        independentLoops: pathIndependentLoops,
         nonTouchingGroups: this.getAllNonTouchingLoops(pathIndependentLoops)
     };
   }
 
   private convertToAdjList(nodes: any[], edges: any[]) {
-    // hena 2na h3mel adjacency list mn el nodes wel edges 3a4an yb2a sahel 3lya 23mel 2l dfs 
+    // hena 2na h3mel adjacency list mn el nodes wel edges 3a4an yb2a sahel 3lya 23mel 2l dfs
     // w 2ana bageb 2l paths w 2l loops
     const adjList: any = {};
     nodes.forEach(node => {
@@ -212,14 +347,14 @@ export class MasonSolver {
   private isNotTouchingAny(candidate: string[], currentSet: string[][]): boolean {
     for (const loop of currentSet) {
         if (this.isTouching(candidate, loop)) {
-            return false; 
+            return false;
         }
     }
     return true;
   }
 
   private getAllNonTouchingLoops(loops: string[][]): string[][][][] {
-    const allNonTouchingResults: string[][][][] = []; 
+    const allNonTouchingResults: string[][][][] = [];
 
     for (let currentSize = 2; currentSize <= loops.length; currentSize++) {
         const groups = this.findGroupsOfSize(loops, currentSize);
@@ -241,9 +376,9 @@ export class MasonSolver {
         for (let i = startIndex; i < allLoops.length; i++) {
             const candidate = allLoops[i];
             if (this.isNotTouchingAny(candidate, currentSet)) {
-                currentSet.push(candidate); 
-                backtrack(i + 1, currentSet); 
-                currentSet.pop(); 
+                currentSet.push(candidate);
+                backtrack(i + 1, currentSet);
+                currentSet.pop();
             }
         }
     }

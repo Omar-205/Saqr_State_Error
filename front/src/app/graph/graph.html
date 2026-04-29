@@ -10,6 +10,74 @@
     </div>
   </div>
   <div id="cy">
-  
+
+  </div>
+  <div class="mt-3 p-3 bg-gray-100 rounded-lg">
+    <h3 class="font-semibold mb-2">Guidelines</h3>
+    <ol class="list-decimal ml-5">
+      <li>Double Click on the canvas to add nodes.</li>
+      <li>Click on a node to get it green.</li>
+      <li>Set the edge weight above, then shift+clk on the target node (to put the weighted edge between the green node and this target node).</li>
+      <li>Select a node or edge and press Delete to remove it.</li>
+      <li>press calculate to get the ooverall transfer function.</li>
+    </ol>
+  </div>
+  <div class="mt-4 p-3 bg-white rounded-lg border" *ngIf="masonDetails() as details">
+    <div class="flex items-center justify-between">
+      <h3 class="font-semibold">Step-by-step Mason's Rule</h3>
+      <button class="bg-gray-200 px-2 py-0.5 rounded-md" (click)="clearStepHighlight()">Clear highlight</button>
+    </div>
+    <p class="text-sm text-gray-600 mt-1">Click any loop or forward path to highlight it on the graph.</p>
+
+    <div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mt-3">
+      <div>
+        <h4 class="font-semibold">Loops (L1, L2, ...)</h4>
+        <ol class="list-decimal ml-5 mt-2">
+          <li *ngFor="let loop of details.loops; let i = index">
+            <button
+              class="step-button"
+              [class.step-button-active]="activeStepIndex() === getLoopStepIndex(i)"
+              (click)="highlightStep(getLoopStepIndex(i))">
+              {{loop.id}}: {{formatPath(loop.nodes.concat(loop.nodes[0]))}} (gain = {{loop.gain | number:'1.4-4'}})
+            </button>
+          </li>
+        </ol>
+        <p class="text-sm text-gray-500 mt-2" *ngIf="details.loops.length === 0">No loops detected.</p>
+      </div>
+
+      <div>
+        <h4 class="font-semibold">Forward Paths (P1, P2, ...)</h4>
+        <ol class="list-decimal ml-5 mt-2">
+          <li *ngFor="let path of details.forwardPaths; let i = index">
+            <button
+              class="step-button"
+              [class.step-button-active]="activeStepIndex() === getPathStepIndex(i)"
+              (click)="highlightStep(getPathStepIndex(i))">
+              {{path.id}}: {{formatPath(path.nodes)}} (gain = {{path.gain | number:'1.4-4'}})
+            </button>
+          </li>
+        </ol>
+        <p class="text-sm text-gray-500 mt-2" *ngIf="details.forwardPaths.length === 0">No forward paths detected.</p>
+      </div>
+    </div>
+
+    <div class="mt-4">
+      <h4 class="font-semibold">Delta (Δ) and intermediate values</h4>
+      <ul class="list-disc ml-5 mt-2">
+        <li *ngFor="let line of details.deltaSteps">{{line}}</li>
+      </ul>
+      <p class="mt-2 text-sm">Numerator Σ(Pk * Δk) = {{details.numerator | number:'1.4-4'}}</p>
+      <p class="text-sm">Overall transfer function = Σ(Pk * Δk) / Δ</p>
+    </div>
+
+    <div class="mt-4">
+      <h4 class="font-semibold">Per-path Δk steps</h4>
+      <div class="mt-2" *ngFor="let pathDelta of details.pathDeltas; let i = index">
+        <p class="font-medium">{{pathDelta.pathId}}: Δ{{i + 1}} = {{pathDelta.delta | number:'1.4-4'}}</p>
+        <ul class="list-disc ml-5 text-sm">
+          <li *ngFor="let step of pathDelta.steps">{{step}}</li>
+        </ul>
+      </div>
+    </div>
   </div>
 </div>

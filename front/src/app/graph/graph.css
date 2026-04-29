@@ -5,3 +5,22 @@
   background-color: #f9f9f9;
   border: 1px solid #ccc;
 }
+
+.step-button {
+  display: inline-block;
+  text-align: left;
+  width: 100%;
+  padding: 4px 6px;
+  border-radius: 6px;
+  background: transparent;
+}
+
+.step-button:hover {
+  background: #f3f4f6;
+}
+
+.step-button-active {
+  background: #fef08a;
+  border: 1px solid #eab308;
+}
+

@@ -1,7 +1,6 @@
-import { AfterViewInit, Component, computed, ElementRef, EventEmitter, OnDestroy, Output, Signal, signal, ViewChild } from '@angular/core';
-import { FormField } from '@angular/forms/signals';
-import { MasonSolver } from './mason-solver';
-import { NonNullAssert } from '@angular/compiler';
+import { AfterViewInit, Component, computed, EventEmitter, OnDestroy, Output, signal } from '@angular/core';
+import { CommonModule } from '@angular/common';
+import { MasonResultDetail, MasonSolver } from './mason-solver';
 import cytoscape from 'cytoscape';
 import { inject } from '@angular/core';
 
@@ -10,6 +9,7 @@ import { inject } from '@angular/core';
 	standalone: true,
 	templateUrl: './graph.html',
 	styleUrl: './graph.css',
+	imports: [CommonModule],
 })
 export class Graph implements AfterViewInit, OnDestroy {
 
@@ -17,6 +17,9 @@ export class Graph implements AfterViewInit, OnDestroy {
   private masonSolver = inject(MasonSolver);
   transferFunction = signal<string>('0');
   useNodeImageBackground = false;
+		  masonDetails = signal<MasonResultDetail | null>(null);
+		  highlightSteps = signal<HighlightStep[]>([]);
+		  activeStepIndex = signal<number | null>(null);
 
 	@Output() calculate = new EventEmitter()
 
@@ -48,7 +51,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 		}
 	}
 	shift = signal(false);
-	
+
 	initializeCytoscape = () => {
 		this.cy.set( cytoscape({
 			container: document.getElementById('cy'),
@@ -98,6 +101,22 @@ export class Graph implements AfterViewInit, OnDestroy {
 						'label': 'data(weight)',
 						'text-margin-y': -10
 					}
+								},
+				{
+					selector: '.highlighted-node',
+					style: {
+						'background-color': '#fde047',
+						'border-color': '#ca8a04',
+						'border-width': 3,
+					}
+				},
+				{
+					selector: '.highlighted-edge',
+					style: {
+						'line-color': '#ca8a04',
+						'target-arrow-color': '#ca8a04',
+						'width': 4,
+					}
 				}
 			],
 			layout: {
@@ -120,10 +139,10 @@ export class Graph implements AfterViewInit, OnDestroy {
 
 			} else {
 				console.log('clicked on something else');
-				
+
 				if(target.isNode()) {
 					if(!this.shift() || !this.selected() || this.selected().isEdge()) {
-						
+
 						if(this.selected()) {
 							if(this.selected().isNode())
 								this.selected().style("background-color", '#ffffff')
@@ -138,7 +157,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 					}
 				}else {
 					// edges
-					// 'line-color': 'black'						
+					// 'line-color': 'black'
 					if(this.selected()) {
 						if(this.selected().isNode())
 							this.selected().style("background-color", '#ffffff')
@@ -154,7 +173,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 			const target = event.target
 			if (target == this.cy()) {
 				console.log('clicked on the background twice');
-				
+
 				this.cy()?.add({ data: { id: generateUUID(), label: this.getNextLabel()}, position: event.position})
 			} else {
 				console.log('clicked on something else twice');
@@ -164,7 +183,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 		// don't forget one()
 		// console.log(this.cy()?.nodes().map((n: any) => n._private.data));
 		// console.log(this.cy()?.edges().map((n: any) => n._private.data));
-		
+
 	}
 	selected = signal<any>(null);
 	inputWeight = signal(0)
@@ -193,7 +212,7 @@ export class Graph implements AfterViewInit, OnDestroy {
 		}
 		this.cy()?.remove(this.selected())
 		console.log(this.selected());
-		
+
 		this.labels[label] = false
 		this.selected.set(null)
 		/* console.log(this.cy()?.nodes().map((n: any) => n._private.data));
@@ -208,19 +227,100 @@ export class Graph implements AfterViewInit, OnDestroy {
 
 		if (!currentNodes || !currentEdges) return;
 		console.log('Calculating Mason...');
-		const result = this.masonSolver.solve(currentNodes, currentEdges);
+			const details = this.masonSolver.solveWithDetails(currentNodes, currentEdges);
 
-		console.log('Final Result:', result);
+			console.log('Final Result:', details.overallGain);
 
-		if (typeof result === 'number') {
-			this.transferFunction.set(result.toFixed(4)); 
+			this.masonDetails.set(details);
+			this.highlightSteps.set(this.buildHighlightSteps(details));
+			this.activeStepIndex.set(null);
+			this.clearHighlights();
+
+			if (typeof details.overallGain === 'number') {
+			  this.transferFunction.set(details.overallGain.toFixed(4));
 		} else {
-			this.transferFunction.set(result);
+			  this.transferFunction.set(details.overallGain);
 		}
 
-		this.calculate.emit(result);
+			this.calculate.emit(details.overallGain);
 	}
+
+		  highlightStep = (index: number) => {
+			const steps = this.highlightSteps();
+			if (!steps[index]) return;
+			this.activeStepIndex.set(index);
+			this.applyHighlight(steps[index]);
+		  }
+
+		  clearStepHighlight = () => {
+			this.activeStepIndex.set(null);
+			this.clearHighlights();
+		  }
+
+		  formatPath = (nodes: string[]) => nodes.join(' -> ');
+
+								  getLoopStepIndex = (index: number) => index;
+
+								  getPathStepIndex = (index: number) => (this.masonDetails()?.loops.length ?? 0) + index;
+
+		  private buildHighlightSteps(details: MasonResultDetail): HighlightStep[] {
+			const loopSteps = details.loops.map(loop => ({
+			  id: loop.id,
+			  title: `${loop.id} (Loop)` ,
+			  description: this.formatPath(loop.nodes.concat(loop.nodes[0])),
+			  nodes: loop.nodes,
+			  edges: this.edgesFromPath(loop.nodes, true),
+			}));
+
+			const pathSteps = details.forwardPaths.map(path => ({
+			  id: path.id,
+			  title: `${path.id} (Forward Path)`,
+			  description: this.formatPath(path.nodes),
+			  nodes: path.nodes,
+			  edges: this.edgesFromPath(path.nodes, false),
+			}));
+
+			return [...loopSteps, ...pathSteps];
+		  }
+
+		  private edgesFromPath(nodes: string[], isLoop: boolean): StepEdge[] {
+			const edges: StepEdge[] = [];
+			for (let i = 0; i < nodes.length - 1; i++) {
+			  edges.push({ source: nodes[i], target: nodes[i + 1] });
+			}
+			if (isLoop && nodes.length > 1) {
+			  edges.push({ source: nodes[nodes.length - 1], target: nodes[0] });
+			}
+			return edges;
+		  }
+
+		  private applyHighlight(step: HighlightStep) {
+			this.clearHighlights();
+			step.nodes.forEach(nodeId => {
+			  this.cy()?.getElementById(nodeId).addClass('highlighted-node');
+			});
+			step.edges.forEach(edge => {
+			  this.cy()?.edges(`[source = "${edge.source}"][target = "${edge.target}"]`).addClass('highlighted-edge');
+			});
+		  }
+
+		  private clearHighlights() {
+			this.cy()?.elements().removeClass('highlighted-node highlighted-edge');
+		  }
 }
+
+		type StepEdge = {
+		  source: string;
+		  target: string;
+		};
+
+		type HighlightStep = {
+		  id: string;
+		  title: string;
+		  description: string;
+		  nodes: string[];
+		  edges: StepEdge[];
+		};
 
 function generateUUID() {
   const bytes = crypto.getRandomValues(new Uint8Array(16));
