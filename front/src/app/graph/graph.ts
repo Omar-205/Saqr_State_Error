@@ -1,13 +1,12 @@
-import { AfterViewInit, Component, computed,  EventEmitter, OnDestroy, Output,  signal } from '@angular/core';
+import { AfterViewInit, Component, computed, ElementRef, EventEmitter, OnDestroy, Output, Signal, signal, ViewChild } from '@angular/core';
 import { FormField } from '@angular/forms/signals';
 import { MasonSolver } from './mason-solver';
-
+import { NonNullAssert } from '@angular/compiler';
 import cytoscape from 'cytoscape';
 import { inject } from '@angular/core';
 
 @Component({
 	selector: 'app-graph',
-	imports: [FormField],
 	standalone: true,
 	templateUrl: './graph.html',
 	styleUrl: './graph.css',
@@ -15,8 +14,9 @@ import { inject } from '@angular/core';
 export class Graph implements AfterViewInit, OnDestroy {
 
 	private cy= signal<cytoscape.Core | undefined>(undefined)
-	private masonSolver = inject(MasonSolver);
-	transferFunction = signal<string>('0');
+  private masonSolver = inject(MasonSolver);
+  transferFunction = signal<string>('0');
+  useNodeImageBackground = false;
 
 	@Output() calculate = new EventEmitter()
 
@@ -76,7 +76,13 @@ export class Graph implements AfterViewInit, OnDestroy {
 						'color': 'black',
 						"border-color": 'black',
 						'border-width': '2',
-						'font-size': '16px'
+						'font-size': '16px',
+						...(this.useNodeImageBackground
+							? {
+								'background-image': '/saqr.jpeg',
+								'background-fit': 'cover'
+							}
+							: {})
 					}
 				},
 				{
